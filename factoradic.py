@@ -1,12 +1,20 @@
-from math import factorial as fact
 
+# >>> compatibility with Python 3
+from __future__ import print_function, unicode_literals
 import sys
 if sys.version_info < (3,):
     integer_types = (int, long,)
     from itertools import imap
+    from builtins import range as range3  # requires package future in Python2 (unfortunate, but there's no better way)
 else:
     integer_types = (int,)
     imap = map
+    range3 = range
+    unicode = str
+# I use the names imap and range3 to make it explicit for Python2 programmers and avoid confusion
+# <<< compatibility with Python 3
+
+from math import factorial as fact
 
 
 class FactoradicException(Exception):
@@ -14,12 +22,10 @@ class FactoradicException(Exception):
 
 
 class Factoradic(object):
-
-    def __init__(self):  # no value creates a [0] by default
-        self.v = [0]
-
     def __init__(self, value):  # constructs either from a number, a list, a string or a Factoradic object (copy)
-        if isinstance(value, integer_types):
+        if value is None:
+            self.v = [0]  # no value creates a [0] by default
+        elif isinstance(value, integer_types):
             self.v = Factoradic.number_to_factoradic(value)
         elif isinstance(value, Factoradic):
             self.v = value.v[:]  # copy
@@ -29,7 +35,7 @@ class Factoradic(object):
                 # ... and work with naked lists.
             else:
                 raise FactoradicException('Factoradic __init__ failed: value not well formed')
-        elif isinstance(value, basestring):
+        elif isinstance(value, unicode):  # would be basestring in Python2 if not for the __future__ import
             l = Factoradic.string_to_factoradic(value)
             if Factoradic.is_well_formed_factoradic(l):
                 self.v = l
@@ -53,7 +59,7 @@ class Factoradic(object):
     def next(self):  # returns a copy, does not modify the object
         return Factoradic.next_factoradic(self.v)
 
-    def increment(self):  # modifies the object (increases the factoradic value by one)
+    def inc1(self):  # modifies the object (increases the factoradic value by one)
         self.v[len(self.v) - 2] += 1
         Factoradic.cascade_factoradic_digits_inplace(self.v)
 
@@ -77,7 +83,7 @@ class Factoradic(object):
         return Factoradic.generate_permutation_from_factoradic_inplace(self.v, elements)
 
     def padded_to_length(self, n):  # returns a 0-padded version of the Factoradic up to length n
-        return Factoradic(Factoradic.padded_to_length(self.v, n))
+        return Factoradic(Factoradic.padded_to_length_s(self.v, n))
 
     @staticmethod
     def number_to_factoradic(value):  # the one I want, with zero as [0], one as [1, 0], no carriage errors
@@ -94,7 +100,7 @@ class Factoradic(object):
     def cascade_factoradic_digits_inplace(factoradic_value): # in-place. Makes the factoradic well-formed
         reversed_place = 1
         factoradic_value[len(factoradic_value)-1] = 0
-        for i in xrange(len(factoradic_value)-2, 0, -1):
+        for i in range3(len(factoradic_value)-2, 0, -1):
             reversed_place += 1
             if factoradic_value[i] >= reversed_place:
                 factoradic_value[i-1] += factoradic_value[i] // reversed_place
@@ -126,7 +132,7 @@ class Factoradic(object):
 
     @staticmethod
     def is_well_formed_factoradic(factoradic_value):
-        for i in xrange(len(factoradic_value)):
+        for i in range3(len(factoradic_value)):
             if int(factoradic_value[i]) >= (len(factoradic_value) - i):
                 return False
         return True
@@ -134,7 +140,7 @@ class Factoradic(object):
     @staticmethod
     def factoradic_to_number(factoradic_value):
         res = 0
-        for i in xrange(len(factoradic_value) - 1):
+        for i in range3(len(factoradic_value) - 1):
             res += factoradic_value[i] * fact(len(factoradic_value) - 1 - i)
 
         return res
@@ -155,10 +161,10 @@ class Factoradic(object):
 
         # factoradic_value needs to be padded to the length of "elements"
         if size_diff < 0:
-            factoradic_value = Factoradic.padded_to_length(factoradic_value, len(elements))
+            factoradic_value = Factoradic.padded_to_length_s(factoradic_value, len(elements))
 
         # at this point, lengths must match
-        for i in xrange(len(factoradic_value)):
+        for i in range3(len(factoradic_value)):
             res.append(elements.pop(factoradic_value[i]))
         return res
 
@@ -167,7 +173,7 @@ class Factoradic(object):
         return Factoradic.generate_permutation_from_factoradic_inplace(factoradic_value, elements[:])
 
     @staticmethod
-    def padded_to_length(factoradic_value, new_len):
+    def padded_to_length_s(factoradic_value, new_len):
         if len(factoradic_value) < new_len:
             diff = new_len - len(factoradic_value)
             padding = [0] * diff
@@ -178,9 +184,9 @@ class Factoradic(object):
 
 if __name__ == "__main__":
     # Wikipedia example: 463 == factoradic_to_number(string_to_factoradic("341010"))
-    print 463, '<=> ', Factoradic.factoradic_to_number(Factoradic.string_to_factoradic("341010"))
-    print "factoradic", Factoradic.string_to_factoradic("341010"), \
-        "<=> factoradic", Factoradic.number_to_factoradic(463)
+    print(463, '<=> ', Factoradic.factoradic_to_number(Factoradic.string_to_factoradic("341010")))
+    print("factoradic", Factoradic.string_to_factoradic("341010"),
+          "<=> factoradic", Factoradic.number_to_factoradic(463))
     assert 463 == Factoradic.factoradic_to_number(Factoradic.string_to_factoradic("341010")), "test case ERROR"
     assert Factoradic.string_to_factoradic("341010") == Factoradic.number_to_factoradic(463), "test case ERROR"
 
@@ -193,46 +199,51 @@ if __name__ == "__main__":
     assert Factoradic.number_to_factoradic(7) == [1, 0, 1, 0], "test case ERROR (7)"
 
     fj = Factoradic.number_to_factoradic(0)
-    for j in xrange(0, 720):
+    for j in range3(0, 720):
         # print j, number_to_factoradic(j), "fj", fj
         assert Factoradic.number_to_factoradic(j) == fj, "ERROR factoradics don't match"
         fj = Factoradic.next_factoradic(fj)
         assert Factoradic.number_to_factoradic(j) != fj, "ERROR consecutive factoradics shouldn't match"
 
-    for j in xrange(20):
-        elements = range(3)
-        # factoradic = padded_to_length(number_to_factoradic(j), len(elements)) # not required
+    for j in range3(20):
+        elements = list(range3(3))
+        # factoradic = Factoradic.padded_to_length_s(number_to_factoradic(j), len(elements)) # not required (visual)
         factoradic = Factoradic.number_to_factoradic(j)
         # print j, factoradic, generate_permutation_from_factoradic_inplace(factoradic, elements)  # this also works...
         # ... because we regenerate "elements" every loop, but generally we don't want to modify parameters
-        print j, factoradic, Factoradic.generate_permutation_from_factoradic(factoradic, elements)
+        print(j, factoradic, Factoradic.generate_permutation_from_factoradic(factoradic, elements))
 
     fx = [463,0]
-    print fx, "cascaded =>", Factoradic.cascade_factoradic_digits(fx)
+    print(fx, "cascaded =>", Factoradic.cascade_factoradic_digits(fx))
     fx = [9999999999, 0]
-    print fx, "cascaded =>", Factoradic.cascade_factoradic_digits(fx)
+    print(fx, "cascaded =>", Factoradic.cascade_factoradic_digits(fx))
 
     Factoradic.cascade_factoradic_digits_inplace(fx)
-    print fx, "to number =>", Factoradic.factoradic_to_number(fx)
-    print "341010 to number =>", Factoradic.factoradic_to_number(Factoradic.string_to_factoradic("341010"))
+    print(fx, "to number =>", Factoradic.factoradic_to_number(fx))
+    print("341010 to number =>", Factoradic.factoradic_to_number(Factoradic.string_to_factoradic("341010")))
 
-    print 9999999999, "to factoradic =>", Factoradic.number_to_factoradic(9999999999)
+    print(9999999999, "to factoradic =>", Factoradic.number_to_factoradic(9999999999))
 
     # example found online, with a big Mersenne prime
     N = (2 ** 607) - 1
-    print "N = (2 ** 607) - 1 # =>", N
+    print("N = (2 ** 607) - 1 # =>", N)
     n_f = Factoradic.number_to_factoradic(N)
-    print "factoradic(N) =>", n_f
-    print "length of factoradic(N):", len(n_f)
+    print("factoradic(N) =>", n_f)
+    print("length of factoradic(N):", len(n_f))
 
-    perm_n_f = Factoradic.generate_permutation_from_factoradic(n_f, range(len(n_f)))
+    perm_n_f = Factoradic.generate_permutation_from_factoradic(n_f, list(range3(len(n_f))))
 
-    print "permutation number factoradic(N) of the ordered list from [0, 1, 2, ... 112] =>", perm_n_f
+    print("permutation number factoradic(N) of the ordered list from [0, 1, 2, ... 112] =>", perm_n_f)
     # observation: by definition, each element of perm_n_f is >= to n_f for every position, ...
     # ... for the canonical [0...len(n_f)] list of elements
 
-    print "same with a Factoradic object:"
+    print("same with a Factoradic object:")
     f_1 = Factoradic(N)
-    print N
-    print "->", f_1
-    print f_1.permutation_inplace(range(f_1.length()))
+    print(N)
+    print("->", f_1)
+    print(f_1.permutation_inplace(list(range3(f_1.length()))))
+
+    print("-----")
+
+    f_2 = Factoradic("341010")
+    print("Factoradic(\"341010\") ->", f_2, '->', f_2.to_number())
