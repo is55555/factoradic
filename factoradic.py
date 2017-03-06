@@ -185,7 +185,8 @@ class Factoradic(object):
 if __name__ == "__main__":
     import tests
 
-    suite = tests.unittest.TestLoader().loadTestsFromTestCase(tests.TestCase_factoradic)
+    suite = tests.unittest.TestLoader().loadTestsFromTestCase(tests.TestCaseFactoradicLowlevel)
+    suite.addTests(tests.unittest.TestLoader().loadTestsFromTestCase(tests.TestCaseFactoradicObject))
     tests.unittest.TextTestRunner(verbosity=2).run(suite)
 
     tests.unittest.TestSuite(tests.suite())

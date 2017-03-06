@@ -17,11 +17,9 @@ from factoradic import Factoradic
 import unittest
 import functools
 import time
-import random
 
-
+# >>> profiling
 PROF_DATA = {}
-
 
 def profile_time(fn):
     @functools.wraps(fn)
@@ -46,50 +44,36 @@ def calc_prof_data():
     for fname, data in PROF_DATA.items():
         max_time = max(data['times'])
         avg_time = sum(data['times']) / len(data['times'])
-        #print "Function %s called %d times. " % (fname, data['count']),
-        #print 'Execution time max: %.3f, average: %.3f' % (max_time, avg_time)
         PROF_DATA[fname]['max'] = max_time
         PROF_DATA[fname]['avg'] = avg_time
+
 
 def print_prof_data():
     for fname, data in PROF_DATA.items():
         max_time = PROF_DATA[fname]['max']
         avg_time = PROF_DATA[fname]['avg']
-        print("Function %s called %d times. " % (fname, data['count']),)
-        print('Execution time max: %.3f, average: %.3f' % (max_time, avg_time))
-
-def calc_and_print_prof_data():
-    for fname, data in PROF_DATA.items():
-        max_time = max(data['times'])
-        avg_time = sum(data['times']) / len(data['times'])
-        print("Function %s called %d times. " % (fname, data['count']),)
-        print('Execution time max: %.3f, average: %.3f' % (max_time, avg_time))
-        PROF_DATA[fname]['max'] = max_time
-        PROF_DATA[fname]['avg'] = avg_time
+        print('\nFunction %s called %d times. Execution time max: %.3f, average: %.3f.' % (fname, data['count'],
+                                                                                        max_time, avg_time),)
 
 
 def clear_profile_time():
     global PROF_DATA
     PROF_DATA = {}
+# <<< profiling
 
 
-
-class TestCase_factoradic(unittest.TestCase):
+class TestCaseFactoradicLowlevel(unittest.TestCase):
     def setUp(self):
-        print("setUp")
+        print("----- setUp    -----")
 
     def tearDown(self):
-        print("tearDown")
+        print("----- tearDown -----")
         clear_profile_time()
 
-    def test_misc(self):
+    def test_known_cases_and_conversions(self):
         # Wikipedia example: 463 == factoradic_to_number(string_to_factoradic("341010"))
-        print(463, '<=> ', Factoradic.factoradic_to_number(Factoradic.string_to_factoradic("341010")))
-        print("factoradic", Factoradic.string_to_factoradic("341010"),
-              "<=> factoradic", Factoradic.number_to_factoradic(463))
-        assert 463 == Factoradic.factoradic_to_number(Factoradic.string_to_factoradic("341010")), "test case ERROR"
-        assert Factoradic.string_to_factoradic("341010") == Factoradic.number_to_factoradic(463), "test case ERROR"
-
+        assert 463 == Factoradic.factoradic_to_number(Factoradic.string_to_factoradic("341010")), "test case ERROR 463"
+        assert Factoradic.string_to_factoradic("341010") == Factoradic.number_to_factoradic(463), "test case ERROR 463"
         assert Factoradic.number_to_factoradic(0) == [0], "test case ERROR (0)"
         assert Factoradic.number_to_factoradic(1) == [1, 0], "test case ERROR (1)"
         assert Factoradic.number_to_factoradic(2) == [1, 0, 0], "test case ERROR (2)"
@@ -98,13 +82,33 @@ class TestCase_factoradic(unittest.TestCase):
         # ... for carry-over.
         assert Factoradic.number_to_factoradic(7) == [1, 0, 1, 0], "test case ERROR (7)"
 
-        fj = Factoradic.number_to_factoradic(0)
+    def test_factoradic_iteration(self):
+        f_j = Factoradic.number_to_factoradic(0)
         for j in range3(0, 720):
-            # print j, number_to_factoradic(j), "fj", fj
-            assert Factoradic.number_to_factoradic(j) == fj, "ERROR factoradics don't match"
-            fj = Factoradic.next_factoradic(fj)
-            assert Factoradic.number_to_factoradic(j) != fj, "ERROR consecutive factoradics shouldn't match"
+            # print(j, number_to_factoradic(j), "f_j", f_j)
+            assert Factoradic.number_to_factoradic(j) == f_j, "ERROR factoradics don't match"
+            f_j = Factoradic.next_factoradic(f_j)
+            assert Factoradic.number_to_factoradic(j) != f_j, "ERROR consecutive factoradics shouldn't match"
 
+    def test_factoradic_iteration_timed(self):
+        start = (2 ** 607) - 1
+        start **= 20  # we need a really large number to even get significant times in a modern computer
+        end   = start + 100  # avg: 0.011 per iteration in my comp. for number_to_factoradic, 0.001 for next_factoradic
+        f_j = Factoradic.number_to_factoradic(start)
+        profiled_number_to_factoradic = profile_time(Factoradic.number_to_factoradic)
+        profiled_next_factoradic = profile_time(Factoradic.next_factoradic)
+
+        for j in range3(start, end):
+            # print(j, number_to_factoradic(j), "f_j", f_j)
+            assert profiled_number_to_factoradic(j) == f_j, "ERROR factoradics don't match"
+            f_j = profiled_next_factoradic(f_j)
+            assert profiled_number_to_factoradic(j) != f_j, "ERROR consecutive factoradics shouldn't match"
+
+        calc_prof_data()
+        print_prof_data()
+
+
+    def test_factoradic_iterate_permutations(self):
         for j in range3(20):
             elements = list(range3(3))
             # factoradic = Factoradic.padded_to_length_s(number_to_factoradic(j), len(elements)) # not required (visual)
@@ -114,17 +118,21 @@ class TestCase_factoradic(unittest.TestCase):
                 # ... because we regenerate "elements" every loop, but generally we don't want to modify parameters
             print(j, factoradic, Factoradic.generate_permutation_from_factoradic(factoradic, elements))
 
+    def test_cascading(self):
         fx = [463, 0]
-        print(fx, "cascaded =>", Factoradic.cascade_factoradic_digits(fx))
+        cascaded_fx = Factoradic.cascade_factoradic_digits(fx)
+        print(fx, "cascaded =>", cascaded_fx)
+        assert str(cascaded_fx) == u"[3, 4, 1, 0, 1, 0]"
+
         fx = [9999999999, 0]
-        print(fx, "cascaded =>", Factoradic.cascade_factoradic_digits(fx))
+        cascaded_fx = Factoradic.cascade_factoradic_digits(fx)
+        print(fx, "cascaded =>", cascaded_fx)
+        assert str(cascaded_fx) == u"[1, 7, 10, 5, 7, 2, 6, 6, 5, 1, 2, 1, 1, 0]"
 
         Factoradic.cascade_factoradic_digits_inplace(fx)
         print(fx, "to number =>", Factoradic.factoradic_to_number(fx))
-        print("341010 to number =>", Factoradic.factoradic_to_number(Factoradic.string_to_factoradic("341010")))
 
-        print(9999999999, "to factoradic =>", Factoradic.number_to_factoradic(9999999999))
-
+    def test_large_permutation(self):
         # example found online, with a big Mersenne prime
         N = (2 ** 607) - 1
         print("N = (2 ** 607) - 1 # =>", N)
@@ -138,21 +146,77 @@ class TestCase_factoradic(unittest.TestCase):
         # observation: by definition, each element of perm_n_f is >= to n_f for every position, ...
         # ... for the canonical [0...len(n_f)] list of elements
 
-        print("same with a Factoradic object:")
-        f_1 = Factoradic(N)
-        print(N)
-        print("->", f_1)
-        print(f_1.permutation_inplace(list(range3(f_1.length()))))
+        assert len(n_f) == 113
 
-        print("-----")
+        res = "[2L, 77L, 30L, 88L, 71L, 102L, 97L, 70L, 4L, 12L, 75L, 71L, 27L, 9L, 91L, 43L, 75L, 58L, 30L, 73L,"
+        res+= " 10L, 11L, 68L, 33L, 77L, 79L, 50L, 80L, 41L, 77L, 48L, 5L, 32L, 78L, 25L, 74L, 0L, 9L, 49L, 3L, 43L,"
+        res+= " 14L, 6L, 20L, 2L, 6L, 61L, 14L, 29L, 7L, 37L, 41L, 5L, 15L, 30L, 54L, 26L, 0L, 41L, 19L, 29L, 50L, 6L,"
+        res+= " 6L, 2L, 25L, 6L, 8L, 44L, 10L, 26L, 13L, 16L, 0L, 14L, 4L, 5L, 24L, 24L, 30L, 22L, 6L, 6L, 29L, 10L,"
+        res+= " 24L, 12L, 23L, 3L, 20L, 15L, 20L, 16L, 11L, 12L, 7L, 2L, 15L, 10L, 5L, 5L, 8L, 6L, 7L, 2L, 0L, 0L,"
+        res+= " 1L, 0L, 1L, 0L, 1L, 0L]"
+
+        assert str(n_f) == res
+
+        perm_str  = "[2, 78, 31, 91, 73, 107, 102, 72, 5, 14, 82, 77, 30, 11, 104, 49, 87, 65, 36, 88, 13, 16, 84, 42,"
+        perm_str += " 98, 101, 61, 106, 52, 103, 60, 7, 43, 111, 34, 108, 0, 17, 69, 6, 63, 24, 12, 35, 4, 18, 99, 28,"
+        perm_str += " 53, 20, 67, 75, 15, 37, 58, 105, 54, 1, 85, 45, 64, 110, 22, 23, 9, 62, 26, 32, 112, 39, 74, 46,"
+        perm_str += " 51, 3, 50, 25, 29, 83, 86, 96, 80, 38, 40, 109, 55, 94, 59, 95, 21, 92, 76, 97, 81, 66, 70, 47,"
+        perm_str += " 19, 100, 71, 44, 48, 79, 57, 89, 27, 8, 10, 41, 33, 68, 56, 93, 90]"
+
+        assert str(perm_n_f) == perm_str
+
+    def test_misc(self):
+        print(9999999999, "to factoradic =>", Factoradic.number_to_factoradic(9999999999))
 
         f_2 = Factoradic("341010")
         print("Factoradic(\"341010\") ->", f_2, '->', f_2.to_number())
 
 
+class TestCaseFactoradicObject(unittest.TestCase):
+    def setUp(self):
+        print("----- setUp    -----")
+
+    def tearDown(self):
+        print("----- tearDown -----")
+        clear_profile_time()
+
+    def test_large_permutation(self):
+        # example found online, with a big Mersenne prime
+        N = (2 ** 607) - 1
+
+        print("with a Factoradic object:")
+        print("N = (2 ** 607) - 1 # =>", N)
+        f_1 = Factoradic(N)
+        print("factoradic(N) =>", f_1)
+        print("length of factoradic(N):", f_1.length())
+        perm_f1 = f_1.permutation_inplace(list(range3(f_1.length())))
+        print("permutation number factoradic(N) of the ordered list from [0, 1, 2, ... 112] =>", perm_f1)
+
+        assert f_1.length() == 113
+
+        res = "[2L, 77L, 30L, 88L, 71L, 102L, 97L, 70L, 4L, 12L, 75L, 71L, 27L, 9L, 91L, 43L, 75L, 58L, 30L, 73L,"
+        res+= " 10L, 11L, 68L, 33L, 77L, 79L, 50L, 80L, 41L, 77L, 48L, 5L, 32L, 78L, 25L, 74L, 0L, 9L, 49L, 3L, 43L,"
+        res+= " 14L, 6L, 20L, 2L, 6L, 61L, 14L, 29L, 7L, 37L, 41L, 5L, 15L, 30L, 54L, 26L, 0L, 41L, 19L, 29L, 50L, 6L,"
+        res+= " 6L, 2L, 25L, 6L, 8L, 44L, 10L, 26L, 13L, 16L, 0L, 14L, 4L, 5L, 24L, 24L, 30L, 22L, 6L, 6L, 29L, 10L,"
+        res+= " 24L, 12L, 23L, 3L, 20L, 15L, 20L, 16L, 11L, 12L, 7L, 2L, 15L, 10L, 5L, 5L, 8L, 6L, 7L, 2L, 0L, 0L,"
+        res+= " 1L, 0L, 1L, 0L, 1L, 0L]"
+
+        assert str(f_1) == res
+
+        perm_str  = "[2, 78, 31, 91, 73, 107, 102, 72, 5, 14, 82, 77, 30, 11, 104, 49, 87, 65, 36, 88, 13, 16, 84, 42,"
+        perm_str += " 98, 101, 61, 106, 52, 103, 60, 7, 43, 111, 34, 108, 0, 17, 69, 6, 63, 24, 12, 35, 4, 18, 99, 28,"
+        perm_str += " 53, 20, 67, 75, 15, 37, 58, 105, 54, 1, 85, 45, 64, 110, 22, 23, 9, 62, 26, 32, 112, 39, 74, 46,"
+        perm_str += " 51, 3, 50, 25, 29, 83, 86, 96, 80, 38, 40, 109, 55, 94, 59, 95, 21, 92, 76, 97, 81, 66, 70, 47,"
+        perm_str += " 19, 100, 71, 44, 48, 79, 57, 89, 27, 8, 10, 41, 33, 68, 56, 93, 90]"
+
+        assert str(perm_f1) == perm_str
+
+
 def suite():
     my_suite = unittest.TestSuite()
-    my_suite.addTest(unittest.makeSuite(TestCase_factoradic, 'tests for Factoradic'))
+    my_suite.addTest(unittest.makeSuite(TestCaseFactoradicLowlevel, 'tests for Factoradic as a bare list'))
+    my_suite.addTest(unittest.makeSuite(TestCaseFactoradicObject, 'tests for Factoradic as class object'))
+
     return my_suite
 
 
