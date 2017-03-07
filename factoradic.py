@@ -2,11 +2,11 @@
 # >>> compatibility with Python 3
 from __future__ import print_function, unicode_literals
 import sys
-if sys.version_info < (3,):
+if sys.version_info < (3,):  # pragma: no cover
     integer_types = (int, long,)
     from itertools import imap
     from builtins import range as range3  # requires package future in Python2 (unfortunate, but there's no better way)
-else:
+else:  # pragma: no cover
     integer_types = (int,)
     imap = map
     range3 = range
@@ -44,8 +44,6 @@ class Factoradic(object):
 
         while self.v[0] == 0 and len(self.v) > 1:  # zero-padded value - normalise to remove padding.
             self.v.pop(0)
-
-
 
     def __str__(self):
         # return "".join(imap(lambda x: str(x), self.v)) # would only work for small factoradics

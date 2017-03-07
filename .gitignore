@@ -3,6 +3,7 @@ gitignore_*
 
 # coverage data
 *.coverage
+htmlcov*
 
 #OS junk files
 [Tt]humbs.db

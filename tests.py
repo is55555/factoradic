@@ -1,11 +1,11 @@
 # >>> compatibility with Python 3
 from __future__ import print_function, unicode_literals
 import sys
-if sys.version_info < (3,):
+if sys.version_info < (3,):  # pragma: no cover
     integer_types = (int, long,)
     # from itertools import imap
     from builtins import range as range3  # requires package future in Python2 (unfortunate, but there's no better way)
-else:
+else:  # pragma: no cover
     integer_types = (int,)
     # imap = map
     range3 = range
@@ -183,6 +183,9 @@ class TestCaseFactoradicLowlevel(unittest.TestCase):
 
     def test_padding_zeroes(self):
         f = Factoradic(5)  # [2,1,0]
+        list_no_pad = Factoradic.padded_to_length_s(f.v, f.length())  # should make no change
+        assert f == list_no_pad, "ERROR: padding to the same length should make no change"
+
         list_f = Factoradic.padded_to_length_s(f.v, 5)
 
         assert list_f == [0,0,2,1,0]
@@ -360,7 +363,7 @@ def suite():
     return my_suite
 
 
-if __name__ == '__main__':
+if __name__ == '__main__':  # pragma: no cover
     # from coverage import coverage
     #
     # cov = coverage()
