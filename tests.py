@@ -13,13 +13,16 @@ else:
 # I use the names imap and range3 to make it explicit for Python2 programmers and avoid confusion
 # <<< compatibility with Python 3
 
-from factoradic import Factoradic
+from factoradic import Factoradic, FactoradicException
 import unittest
 import functools
 import time
+import random
+
 
 # >>> profiling
 PROF_DATA = {}
+
 
 def profile_time(fn):
     @functools.wraps(fn)
@@ -178,6 +181,24 @@ class TestCaseFactoradicLowlevel(unittest.TestCase):
         f_2 = Factoradic("341010")
         print("Factoradic(\"341010\") ->", f_2, '->', f_2.to_number())
 
+    def test_padding_zeroes(self):
+        f = Factoradic(5)  # [2,1,0]
+        list_f = Factoradic.padded_to_length_s(f.v, 5)
+
+        assert list_f == [0,0,2,1,0]
+        assert f.v == [2,1,0]
+        print("PADDING", list_f, f.v)
+
+        for _ in range3(100):  # tests random paddings and verifies they stay consistent
+            f = Factoradic(random.randint(0,100000000))
+            f_padding_size = random.randint(0,50)
+            list_paddedf = Factoradic.padded_to_length_s(f.v, f.length() + f_padding_size)
+
+            assert len(list_paddedf) == f.length() + f_padding_size
+            assert f.v == list_paddedf[f_padding_size:]
+
+
+
 
 class TestCaseFactoradicObject(unittest.TestCase):
     def setUp(self):
@@ -186,6 +207,95 @@ class TestCaseFactoradicObject(unittest.TestCase):
     def tearDown(self):
         print("----- tearDown -----")
         clear_profile_time()
+
+    def test_factoradic_init_inc1_next(self):
+        f  = Factoradic()
+        f0 = Factoradic(0)
+
+        assert f == f0, "ERROR - null factoradic and factoradic zero should be equal"
+
+        f.inc1()
+        assert f == Factoradic([1,0])
+        f0.inc1()
+        assert f0 == Factoradic([1,0])
+
+        assert f == f0, "ERROR - should be the same after both equal factoradics have been inc1'ed"
+
+        f0_alt = Factoradic(f0)  # should make a copy
+
+        assert f0 == f0_alt, "ERROR - factoradic and its copy by constructor should be equal"
+
+        f0.inc1()
+
+        assert f0 != f0_alt, "ERROR - factoradic and its copy should be different after only one is altered"
+
+        assert f0 == f0_alt.next(), "ERROR - should match (inc1 and next())"
+        assert f0 != f0_alt, "ERROR - factoradic and copy should be different after only one is altered - after next()"
+
+        f1 = Factoradic([1,0])
+
+        f0_alt = Factoradic(0)
+        assert f0_alt.next() == f1, "ERROR - next factoradic to [0] should be equal to [1,0]"
+
+    def test_trailing_zeroes(self):
+        f0_00 = Factoradic(0)
+        f0_01 = Factoradic([0])
+        f0_02 = Factoradic([0,0])
+
+        assert f0_00 == f0_01, "ERROR trailing zeroes should be ignored for equality"
+        assert f0_00 == f0_02, "ERROR trailing zeroes should be ignored for equality"
+
+        print("trailing zeroes", f0_00, f0_02, [0] == [0,0], f0_00.v, f0_02.v)
+
+    def test_increment(self):
+        f = Factoradic(2)
+        f.increment(5)
+        f_ = Factoradic(f)  # copy constructor
+        f_.increment(0)
+
+        assert f == Factoradic(7)
+        assert f == f_
+
+        f0 = Factoradic(0)
+
+        f0.increment(1)
+        assert f0 == Factoradic([1,0])
+        assert f0 == Factoradic(0).next()
+
+        f0 = Factoradic(0)
+
+        f0.increment(5)
+        assert f0 == Factoradic(5)
+
+        for _ in range3(100):
+            x = random.randint(0,10000)
+            y = random.randint(0,10000)
+
+            f_x = Factoradic(x)
+            f_inc = Factoradic(x+y)
+            f_x.increment(y)
+            assert f_x == f_inc, "ERROR in random increment"
+            f_x_pluszero = Factoradic(f_x)
+            f_x_pluszero.increment(0)
+            assert f_x_pluszero == f_x
+            f_x_plusone = Factoradic(f_x)
+            f_x_plusone.increment(1)
+            assert f_x_plusone == f_x.next()
+
+        with self.assertRaises(FactoradicException):
+            f.increment(-1)  # negatives not allowed
+        with self.assertRaises(FactoradicException):
+            f.increment("five")  # wrong type
+        with self.assertRaises(FactoradicException):
+            f.increment([1,1,0])  # would be factoradic for 3, but we don't accept this at the moment (convert to int)
+
+    def test_badly_formed_factoradic(self):
+        with self.assertRaises(FactoradicException):
+            Factoradic([1])  # badly formed factoradic
+        with self.assertRaises(FactoradicException):
+            Factoradic([2,0])  # badly formed factoradic
+        with self.assertRaises(FactoradicException):
+            Factoradic((1,0))  # unrecognised value type
 
     def test_large_permutation(self):
         # example found online, with a big Mersenne prime
@@ -225,6 +335,22 @@ class TestCaseFactoradicObject(unittest.TestCase):
 
         assert str(perm_f1) == perm_str
 
+        # test the not-in-place permutation method
+        assert perm_f1 == f_1.permutation(list(range3(f_1.length())))
+
+    def test_comparison_against_unsupported_type(self):
+        with self.assertRaises(FactoradicException):
+            f = Factoradic(0)
+            f == 0
+        with self.assertRaises(FactoradicException):
+            f = Factoradic("0")
+            f == "0"
+        with self.assertRaises(FactoradicException):
+            f = Factoradic([1, 0, 0])
+            f == "[1, 0, 0]"
+        with self.assertRaises(FactoradicException):
+            f = Factoradic([1, 0, 0])
+            f == (1, 0, 0)
 
 def suite():
     my_suite = unittest.TestSuite()
@@ -235,5 +361,14 @@ def suite():
 
 
 if __name__ == '__main__':
-    #unittest.TestSuite(suite())
+    # from coverage import coverage
+    #
+    # cov = coverage()
+    # cov.start()
+
     unittest.main()
+    #
+    # cov.stop()
+    # cov.save()
+    #
+    # cov.html_report()

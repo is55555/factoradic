@@ -1,6 +1,9 @@
 #stuff I want to leave out of the repo
 gitignore_*
 
+# coverage data
+*.coverage
+
 #OS junk files
 [Tt]humbs.db
 *.DS_Store

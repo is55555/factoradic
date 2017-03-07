@@ -22,7 +22,7 @@ class FactoradicException(Exception):
 
 
 class Factoradic(object):
-    def __init__(self, value):  # constructs either from a number, a list, a string or a Factoradic object (copy)
+    def __init__(self, value = None):  # constructs either from a number, a list, a string or a Factoradic object (copy)
         if value is None:
             self.v = [0]  # no value creates a [0] by default
         elif isinstance(value, integer_types):
@@ -39,7 +39,13 @@ class Factoradic(object):
             l = Factoradic.string_to_factoradic(value)
             if Factoradic.is_well_formed_factoradic(l):
                 self.v = l
-        else: raise FactoradicException('Factoradic __init__ failed - could not deal with value ' + repr(value))
+        else:
+            raise FactoradicException('Factoradic __init__ failed - could not deal with value ' + repr(value))
+
+        while self.v[0] == 0 and len(self.v) > 1:  # zero-padded value - normalise to remove padding.
+            self.v.pop(0)
+
+
 
     def __str__(self):
         # return "".join(imap(lambda x: str(x), self.v)) # would only work for small factoradics
@@ -47,11 +53,21 @@ class Factoradic(object):
         # the list.
         return str(self.v)
 
+    def __eq__(self, other):
+        #return self.__dict__ == other.__dict__
+        if isinstance(other, Factoradic):
+            return self.v == other.v  # explicitly compare the relevant state only
+        elif isinstance(other, list):
+            return self.v == other
+        else:
+            raise FactoradicException('comparing Factoradic to unsupported type: ' + str(type(other)))
+
     def length(self):
         return len(self.v)
 
-    def well_formed(self):
-        return Factoradic.is_well_formed_factoradic(self.v)
+    # currently we are not allowing transformations that would make a Factoradic object not well formed
+    #def well_formed(self):
+    #    return Factoradic.is_well_formed_factoradic(self.v)
 
     def to_number(self):
         return Factoradic.factoradic_to_number(self.v)
@@ -60,8 +76,11 @@ class Factoradic(object):
         return Factoradic.next_factoradic(self.v)
 
     def inc1(self):  # modifies the object (increases the factoradic value by one)
-        self.v[len(self.v) - 2] += 1
-        Factoradic.cascade_factoradic_digits_inplace(self.v)
+        if len(self.v) == 1: #  [0] case
+            self.v = [1,0]  # alternatively, inserting 1 to the beginning of [0] is a possibility if that works better
+        else:
+            self.v[len(self.v) - 2] += 1
+            Factoradic.cascade_factoradic_digits_inplace(self.v)
 
     def increment(self, inc):  # modifies the object (increases the factoradic value ) - verifies the parameter
         if isinstance(inc, integer_types):
@@ -71,6 +90,8 @@ class Factoradic(object):
                 raise FactoradicException('Factoradic increment failed: negative value (decrement not supported)')
                 #  just convert to integer and back to subtract - since I'm not supporting negative values this is ...
                 #  ... not a useful feature in this lib. If I add negatives in the future I'll add direct subtraction.
+            if len(self.v) == 1:  # [0] case
+                self.v = [0,0]  # prepare to increment
             self.v[len(self.v) - 2] += inc
             Factoradic.cascade_factoradic_digits_inplace(self.v)
         else:
@@ -81,9 +102,6 @@ class Factoradic(object):
 
     def permutation_inplace(self, elements):  # destroys the given list, only use if the list is no longer required
         return Factoradic.generate_permutation_from_factoradic_inplace(self.v, elements)
-
-    def padded_to_length(self, n):  # returns a 0-padded version of the Factoradic up to length n
-        return Factoradic(Factoradic.padded_to_length_s(self.v, n))
 
     @staticmethod
     def number_to_factoradic(value):  # the one I want, with zero as [0], one as [1, 0], no carriage errors
